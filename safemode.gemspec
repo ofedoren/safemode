@@ -7,7 +7,7 @@ Gem::Specification.new do |s|
   s.version = "1.5.0"
   s.date = Date.today
 
-  s.summary = "A library for safe evaluation of Ruby code based on ParseTree/RubyParser and Ruby2Ruby"
+  s.summary = "A library for safe evaluation of Ruby code based on RubyParser and Ruby2Ruby"
   s.description = "A library for safe evaluation of Ruby code based on RubyParser and Ruby2Ruby. Provides Rails ActionView template handlers for ERB and Haml."
   s.homepage = "https://github.com/svenfuchs/safemode"
   s.licenses = ["MIT"]
