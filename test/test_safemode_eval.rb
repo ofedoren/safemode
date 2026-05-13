@@ -100,6 +100,28 @@ class TestSafemodeEval < Test::Unit::TestCase
     end
   end
 
+  if Gem::Version.new(RUBY_VERSION) >= Gem::Version.new('3.2')
+    def test_pattern_matching_with_data_subclass
+      point_class = Data.define(:x, :y)
+      point = point_class.new(x: 10, y: 20)
+      assert_equal 10, @box.eval('case @point; in {x:}; x; end', { point: point })
+    end
+
+    def test_data_subclass_inherits_data_jail
+      point_class = Data.define(:x, :y)
+      point = point_class.new(x: 10, y: 20)
+      assert_equal [:x, :y], @box.eval('@point.members', { point: point })
+      assert_equal [10, 20], @box.eval('@point.deconstruct', { point: point })
+      assert_equal({ x: 10 }, @box.eval('@point.deconstruct_keys([:x])', { point: point }))
+    end
+
+    def test_data_subclass_jail_blocks_non_whitelisted_methods
+      point_class = Data.define(:x, :y)
+      point = point_class.new(x: 10, y: 20)
+      assert_raise(Safemode::NoMethodError) { @box.eval('@point.instance_variables', { point: point }) }
+    end
+  end
+
   TestHelper.no_method_error_raising_calls.each do |call|
     class_eval %Q(
       def test_calling_#{call.gsub(/[\W]/, '_')}_should_raise_no_method
