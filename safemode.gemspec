@@ -54,12 +54,12 @@ Gem::Specification.new do |s|
 
   s.required_ruby_version = ">= 2.7", "< 3.2"
 
-  s.add_runtime_dependency "ruby2ruby", ">= 2.4.0"
-  s.add_runtime_dependency "ruby_parser", ">= 3.10.1"
-  s.add_runtime_dependency "sexp_processor", ">= 4.10.0"
+  s.add_runtime_dependency "ruby2ruby", "~> 2.4"
+  s.add_runtime_dependency "ruby_parser", "~> 3.10"
+  s.add_runtime_dependency "sexp_processor", "~> 4.10"
 
-  s.add_development_dependency "rake"
-  s.add_development_dependency "rdoc"
-  s.add_development_dependency "simplecov"
-  s.add_development_dependency "test-unit"
+  s.add_development_dependency "rake", "~> 13.4"
+  s.add_development_dependency "rdoc", "~> 7.2"
+  s.add_development_dependency "simplecov", "~> 0.22"
+  s.add_development_dependency "test-unit", "~> 3.7"
 end
