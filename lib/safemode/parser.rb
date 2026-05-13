@@ -87,7 +87,8 @@ module Safemode
                    :colon2,
                    # unnecessarily advanced?
                    :argscat, :argspush, :splat,
-                   :op_asgn1, :op_asgn2, :op_asgn_and, :op_asgn_or,
+                   :op_asgn, :op_asgn1, :op_asgn2, :op_asgn_and, :op_asgn_or,
+                   :safe_op_asgn,
                    # needed for haml
                    :block ]
 
