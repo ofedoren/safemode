@@ -17,15 +17,11 @@ module Safemode
     end
 
     def core_classes
-      klasses = [ Array, Float, Hash, Range, String, Symbol, Time, NilClass, FalseClass, TrueClass ]
+      klasses = [ Array, Float, Hash, Integer, Range, String, Symbol, Time, NilClass, FalseClass, TrueClass ]
       klasses << Date if defined? Date
       klasses << DateTime if defined? DateTime
-      if RUBY_VERSION >= '2.4.0'
-        klasses << Integer
-      else
-        klasses << Bignum
-        klasses << Fixnum
-      end
+      klasses << Data if defined? Data # Ruby 3.2 addition
+      klasses << Set if defined? Set # Ruby 3.2 addition
       klasses
     end
 
@@ -53,16 +49,6 @@ module Safemode
                     reverse! reverse_each rindex select shift size slice
                     slice! sort sort! transpose to_sentence uniq uniq! unshift
                     values_at zip),
-
-    'Bignum'     => %w(abs blank? ceil chr coerce div divmod downto floor hash
-                    integer? modulo next nonzero? present? quo remainder round
-                    singleton_method_added size step succ times to_f to_i
-                    to_int to_s truncate upto zero?),
-
-    'Fixnum'     => %w(abs blank? ceil chr coerce div divmod downto floor id2name
-                    integer? modulo modulo next nonzero? present? quo remainder
-                    round singleton_method_added size step succ times to_f to_i
-                    to_int to_s to_sym truncate upto zero?),
 
     'Float'      => %w(abs blank? ceil coerce div divmod finite? floor hash
                     infinite? integer? modulo nan? nonzero? present? quo
@@ -115,6 +101,17 @@ module Safemode
 
     'DateTime'   => %w(blank? hour min new_offset newof of offset present? sec
                     sec_fraction strftime to_datetime_default_s to_json zone),
+
+    'Data'       => %w(deconstruct deconstruct_keys hash members),
+
+    'Set'        => %w(any? blank? clear clone collect count delete delete?
+                    delete_if difference disjoint? each each_with_index
+                    each_with_object empty? filter find first flatten
+                    flatten! hash include? inject intersect? intersection
+                    join keep_if length map max member? merge min
+                    present? reject reject! replace select select!
+                    size sort sort_by subset? superset? union
+                    uniq zip),
 
     'NilClass'   => %w(blank? duplicable? present? to_f to_i),
 
