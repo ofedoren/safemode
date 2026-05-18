@@ -67,6 +67,107 @@ class TestSafemodeParser < Test::Unit::TestCase
     end
   end
 
+  def test_safe_attrasgn_is_disabled
+    assert_raise Safemode::SecurityError do
+      jail('@article&.title = "new_value"')
+    end
+  end
+
+  def test_safe_op_asgn2_is_allowed
+    assert_nothing_raised do
+      jail('@article&.title ||= "new_value"')
+    end
+  end
+
+  def test_lambda_is_disabled
+    assert_raise Safemode::SecurityError do
+      jail('-> { 1 }')
+    end
+  end
+
+  def test_case_in_with_literal
+    jailed = jail("case x; in 1; \"one\"; in 2; \"two\"; end")
+    assert_match(/in 1 then/, jailed)
+    assert_match(/in 2 then/, jailed)
+    assert_match(/to_jail\.x/, jailed)
+  end
+
+  def test_case_in_with_array_pattern
+    jailed = jail("case x; in [a, b]; a; end")
+    assert_match(/in \[a, b\] then/, jailed)
+    assert_no_match(/\^a/, jailed)
+  end
+
+  def test_case_in_with_hash_pattern
+    jailed = jail("case x; in {name:}; name; end")
+    assert_match(/in \{ name: \} then/, jailed)
+    assert_no_match(/\^name/, jailed)
+  end
+
+  def test_case_in_with_find_pattern
+    jailed = jail("case x; in [*, 2, *]; \"found\"; end")
+    assert_match(/in \[\*, 2, \*\] then/, jailed)
+  end
+
+  def test_case_in_pin_operator
+    jailed = jail("y = 1; case x; in ^y; true; end")
+    assert_match(/in \^y then/, jailed)
+  end
+
+  def test_case_in_body_does_not_pin_variables
+    jailed = jail("case x; in [a, b]; a; end")
+    lines = jailed.lines
+    body_start = lines.index { |l| l.match?(/^in \[/) } + 1
+    lines[body_start..].each { |line| assert_no_match(/\^[a-z]/, line) }
+  end
+
+  def test_case_in_multiple_clauses
+    jailed = jail("case x; in [a, b]; a; in {c:}; c; end")
+    assert_match(/in \[a, b\] then/, jailed)
+    assert_match(/in \{ c: \} then/, jailed)
+  end
+
+  def test_case_in_with_if_guard
+    jailed = jail("case x; in 1 if true; \"matched\"; end")
+    assert_match(/in 1 if true then/, jailed)
+  end
+
+  def test_case_in_with_unless_guard
+    jailed = jail("case x; in 1 unless false; \"matched\"; end")
+    assert_match(/in 1 unless false then/, jailed)
+  end
+
+  def test_case_in_guard_does_not_pin_variables
+    jailed = jail("case x; in [a, b] if a; a; end")
+    guard_line = jailed.lines.find { |l| l.match?(/^in \[/) }
+    assert_match(/if a then/, guard_line)
+    assert_no_match(/\^a/, guard_line)
+  end
+
+  def test_case_in_guard_jails_method_calls
+    jailed = jail('case x; in {name: n} if n.start_with?("a"); n; end')
+    assert_match(/if n\.to_jail\.start_with\?/, jailed)
+  end
+
+  def test_rightward_assignment
+    jailed = jail("x => a")
+    assert_match(/case to_jail\.x/, jailed)
+    assert_match(/in a then/, jailed)
+  end
+
+  def test_hash_shorthand_in_literal
+    jailed = jail("a = 1; b = 2; { a:, b: }")
+    assert_match(/a:,/, jailed)
+  end
+
+  def test_endless_range
+    assert_jailed "(1..)", "(1..)"
+  end
+
+  def test_beginless_range
+    assert_jailed "(..5)", "(..5)"
+  end
+
 private
 
   def assert_jailed(expected, code)

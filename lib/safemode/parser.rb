@@ -1,7 +1,5 @@
 module Safemode
   class Parser < Ruby2Ruby
-    @@parser = 'RubyParser'
-
     class << self
       def jail(code, allowed_fcalls = [])
         @@allowed_fcalls = allowed_fcalls
@@ -10,16 +8,7 @@ module Safemode
       end
 
       def parse(code)
-        case @@parser
-        when 'RubyParser'
-          RubyParser.new.parse(code)
-        else
-          raise "unknown parser #{@@parser}"
-        end
-      end
-
-      def parser=(parser)
-        @@parser = parser
+        Prism::Translation::RubyParser.parse(code)
       end
     end
 
@@ -86,9 +75,13 @@ module Safemode
                    # :colon2 is used for module constants
                    :colon2,
                    # unnecessarily advanced?
-                   :argscat, :argspush, :splat,
+                   :argscat, :argspush, :splat, :kwsplat,
+                   # NOTE: op_asgn*/safe_op_asgn* do not insert .to_jail on the
+                   # receiver. Setters are called directly on the real object, bypassing Jail.
                    :op_asgn, :op_asgn1, :op_asgn2, :op_asgn_and, :op_asgn_or,
-                   :safe_op_asgn,
+                   :safe_op_asgn, :safe_op_asgn2,
+                   # pattern matching (Ruby 3.0+)
+                   :in, :array_pat, :hash_pat, :find_pat, :kwrest,
                    # needed for haml
                    :block ]
 
@@ -96,18 +89,21 @@ module Safemode
                    # see below for :const handling
                    :defn, :defs, :alias, :valias, :undef, :class, :attrset,
                    :module, :sclass, :colon3,
-                   :fbody, :scope, :block_arg, :postexe,
+                   :fbody, :scope, :block_arg, :postexe, :preexe,
                    :redo, :retry, :begin, :rescue, :resbody, :ensure,
                    :defined, :super, :zsuper, :return,
                    :dmethod, :bmethod, :to_ary, :svalue, :match,
-                   :attrasgn, :cdecl, :cvasgn, :cvdecl, :cvar, :gvar, :gasgn,
+                   :attrasgn, :safe_attrasgn,
+                   :cdecl, :cvasgn, :cvdecl, :cvar, :gvar, :gasgn,
                    :xstr, :dxstr,
                    # not sure how secure ruby regexp is, so leave it out for now
                    :dregx, :dregx_once, :match2, :match3, :nth_ref, :back_ref,
                    # block_pass represents &:method, which would bypass the whitelist e.g. by array.each(&:destroy)
                    # at this point we don't know the receiver so we rather disable it completely,
                    # use array.each { |item| item.destroy } instead
-                   :block_pass ]
+                   :block_pass,
+                   # lambda creates Proc objects
+                   :lambda ]
 
     # SexpProcessor bails when we overwrite these ... but they are listed as
     # "internal nodes that you can't get to" in sexp_processor.rb
@@ -203,6 +199,49 @@ module Safemode
 
         "#{receiver}#{name}#{args}"
       end
+    end
+
+    # Ruby2Ruby bug: __var adds ^ (pin) to all lvars inside :in context,
+    # including the body after "then" where ^ is invalid syntax.
+    # Fix: process body outside the :in context.
+    def process_in(exp)
+      _, pattern, *body = exp
+
+      guard = extract_guard(pattern)
+      cond = process pattern
+      body = body.compact.map { |sexp|
+        in_context :in_body do
+          indent process sexp
+        end
+      }
+
+      body << indent("# do nothing") if body.empty?
+      body = body.join "\n"
+
+      header = "in #{cond}"
+      header << " #{guard}" if guard
+      "#{header} then\n#{body.chomp}"
+    end
+
+    # Prism translates guard clauses (in pattern if cond / in pattern unless cond)
+    # as s(:if, guard, pattern, nil) / s(:if, guard, nil, pattern). We detect this
+    # and rewrite the sexp in-place so process_if renders only the pattern, then
+    # return the guard string for process_in to append.
+    def extract_guard(pattern)
+      return unless pattern.sexp_type == :if
+
+      _, guard_sexp, if_body, else_body = pattern
+      if if_body && !else_body
+        guard_str = in_context(:in_body) { "if #{process guard_sexp.deep_clone}" }
+        pattern.clear
+        if_body.each { |node| pattern << node }
+      elsif else_body && !if_body
+        guard_str = in_context(:in_body) { "unless #{process guard_sexp.deep_clone}" }
+        pattern.clear
+        else_body.each { |node| pattern << node }
+      end
+
+      guard_str
     end
 
     # Ruby2Ruby process_if rewrites if and unless statements in a way that

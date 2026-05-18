@@ -112,6 +112,8 @@ class Article
     Comment
   end
 
+  attr_accessor :status
+
   def method_with_kwargs(a_keyword: false)
     a_keyword
   end
@@ -150,7 +152,7 @@ class Comment
 end
 
 class Article::Jail < Safemode::Jail
-  allow :title, :comments, :is_article?, :comment_class, :method_with_kwargs
+  allow :title, :comments, :is_article?, :comment_class, :method_with_kwargs, :status
 
   def author_name
     "this article's author name"

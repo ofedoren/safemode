@@ -94,6 +94,111 @@ class TestSafemodeEval < Test::Unit::TestCase
     assert @box.eval("@article.method_with_kwargs(a_keyword: true)", @assigns)
   end
 
+  def test_pattern_matching_with_literal
+    assert_equal "matched", @box.eval('case 1; in 1; "matched"; in 2; "nope"; end')
+  end
+
+  def test_pattern_matching_with_array_destructuring
+    assert_equal 1, @box.eval('case [1, 2, 3]; in [a, b, c]; a; end')
+  end
+
+  def test_pattern_matching_with_hash_destructuring
+    assert_equal 1, @box.eval('case({a: 1, b: 2}); in {a:}; a; end')
+  end
+
+  def test_pattern_matching_with_assign
+    assert_equal "two", @box.eval('case @val; in 1; "one"; in 2; "two"; end', { val: 2 })
+  end
+
+  def test_pattern_matching_with_find_pattern
+    assert_equal "found", @box.eval('case [1, 2, 3]; in [*, 2, *]; "found"; end')
+  end
+
+  def test_pattern_matching_with_pin_operator
+    assert_equal "matched", @box.eval('y = 1; case 1; in ^y; "matched"; end')
+  end
+
+  def test_pattern_matching_with_multiple_clauses
+    assert_equal "second", @box.eval('case [3, 4]; in [1, 2]; "first"; in [3, 4]; "second"; end')
+  end
+
+  def test_pattern_matching_no_match_returns_nil
+    assert_nil @box.eval('case 3; in 1; "one"; in 2; "two"; else; nil; end')
+  end
+
+  def test_pattern_matching_with_if_guard
+    assert_equal "positive", @box.eval('case 1; in x if x > 0; "positive"; end')
+  end
+
+  def test_pattern_matching_with_unless_guard
+    assert_equal "not negative", @box.eval('case 1; in x unless x < 0; "not negative"; end')
+  end
+
+  def test_pattern_matching_guard_no_match
+    assert_nil @box.eval('case 1; in x if x < 0; "negative"; else; nil; end')
+  end
+
+  def test_pattern_matching_guard_with_array_pattern
+    assert_equal "yes", @box.eval('case [1, 2]; in [a, b] if a > 0; "yes"; end')
+  end
+
+  def test_pattern_matching_guard_with_hash_pattern
+    assert_equal "alice", @box.eval('case({name: "alice"}); in {name:} if name.start_with?("a"); name; end')
+  end
+
+  def test_rightward_assignment
+    assert_equal 1, @box.eval('[1, 2] => [a, b]; a')
+  end
+
+  def test_pattern_matching_with_jailed_hash
+    assert_equal "an article title", @box.eval('case @data; in {title:}; title; end', { data: { title: "an article title" } })
+  end
+
+  def test_hash_shorthand
+    # TODO: Remove the check once Ruby 3.1 is the minimum
+    if Gem::Version.new(RUBY_VERSION) >= Gem::Version.new('3.1')
+      assert_equal({ a: 1, b: 2 }, @box.eval('a = 1; b = 2; { a:, b: }'))
+    end
+  end
+
+  def test_endless_range
+    assert_equal [3, 4, 5], @box.eval('[1,2,3,4,5][2..]')
+  end
+
+  def test_beginless_range
+    assert_equal [1, 2, 3], @box.eval('[1,2,3,4,5][..2]')
+  end
+
+  # attrasgn (@article.status = val) is blocked at parse time
+  def test_attrasgn_is_blocked
+    assert_raise(Safemode::SecurityError) { @box.eval('@article.status = "new_value"', @assigns) }
+  end
+
+  def test_safe_attrasgn_is_blocked
+    assert_raise(Safemode::SecurityError) { @box.eval('@article&.status = "new_value"', @assigns) }
+  end
+
+  # op_asgn2 (@article.status ||= val) is NOT blocked at parse time.
+  # NOTE: .to_jail is not inserted on the receiver, so the setter is called
+  # directly on the real object, bypassing the Jail whitelist.
+  def test_op_asgn2_bypasses_jail
+    article = Article.new
+    assert_nil article.status
+    @box.eval('@article.status ||= "new_value"', { article: article })
+    assert_equal "new_value", article.status
+  end
+
+  def test_safe_op_asgn2_bypasses_jail
+    article = Article.new
+    assert_nil article.status
+    @box.eval('@article&.status ||= "new_value"', { article: article })
+    assert_equal "new_value", article.status
+  end
+
+  def test_lambda_is_blocked
+    assert_raise(Safemode::SecurityError) { @box.eval('-> { 1 }') }
+  end
+
   def test_sending_to_method_missing
     assert_raise_with_message(Safemode::NoMethodError, /#no_such_method/) do
       @box.eval("@article.no_such_method('arg', key: 'value')", @assigns)

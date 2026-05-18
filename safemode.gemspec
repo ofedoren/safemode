@@ -7,7 +7,7 @@ Gem::Specification.new do |s|
   s.version = "1.5.0"
   s.date = Date.today
 
-  s.summary = "A library for safe evaluation of Ruby code based on RubyParser and Ruby2Ruby"
+  s.summary = "A library for safe evaluation of Ruby code based on Prism and Ruby2Ruby"
   s.description = "A library for safe evaluation of Ruby code based on RubyParser and Ruby2Ruby. Provides Rails ActionView template handlers for ERB and Haml."
   s.homepage = "https://github.com/svenfuchs/safemode"
   s.licenses = ["MIT"]
@@ -55,7 +55,7 @@ Gem::Specification.new do |s|
   s.required_ruby_version = ">= 3.0", "< 3.4"
 
   s.add_runtime_dependency "ruby2ruby", "~> 2.4"
-  s.add_runtime_dependency "ruby_parser", "~> 3.10"
+  s.add_runtime_dependency "prism", "~> 1.0"
   s.add_runtime_dependency "sexp_processor", "~> 4.10"
 
   s.add_development_dependency "rake", "~> 13.4"

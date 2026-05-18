@@ -1,10 +1,8 @@
 require 'rubygems'
 
 require 'ruby2ruby'
-begin
-  require 'ruby_parser' # try to load RubyParser and use it if present
-rescue LoadError => e
-end
+require 'prism'
+require 'prism/translation/ruby_parser'
 
 require 'safemode/core_ext'
 require 'safemode/blankslate'
